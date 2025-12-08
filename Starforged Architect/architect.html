@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Starforged Architect v50: Safe Navigation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        /* --- CORE STYLING --- */
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            font-family: 'Segoe UI', 'Roboto', Helvetica, Arial, sans-serif; 
+            background: #000; color: #aab; overflow: hidden; display: flex;
+        }
+        
+        /* --- SIDEBAR --- */
+        #sidebar { 
+            width: 360px; background: rgba(10, 10, 14, 0.96); 
+            border-right: 1px solid #334; backdrop-filter: blur(10px);
+            display: flex; flex-direction: column; flex-shrink: 0; 
+            z-index: 100; position: relative; transition: transform 0.3s ease;
+        }
+        
+        /* --- MAIN VIEW --- */
+        #main-view { 
+            flex-grow: 1; position: relative; background: #050508; 
+            overflow: hidden; width: 100%; height: 100%;
+        }
+
+        #map-wrapper {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            overflow: hidden; cursor: crosshair;
+        }
+
+        /* --- MOBILE MENU --- */
+        #menu-toggle {
+            display: none; position: absolute; top: 15px; left: 15px; z-index: 200;
+            background: #e05a3e; color: #fff; border: none; border-radius: 4px;
+            padding: 8px 12px; font-weight: bold; font-family: monospace;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5); cursor: pointer;
+        }
+
+        @media (max-width: 800px) {
+            #sidebar {
+                position: fixed; top: 0; left: 0; height: 100%; width: 85%; 
+                max-width: 320px; transform: translateX(-100%); 
+                box-shadow: 5px 0 20px rgba(0,0,0,0.5);
+            }
+            #sidebar.open { transform: translateX(0); }
+            #menu-toggle { display: block; }
+        }
+        
+        /* --- UI ELEMENTS --- */
+        .panel-section { padding: 15px; border-bottom: 1px solid #2a2a35; }
+        .scroll-area { overflow-y: auto; flex-grow: 1; padding: 15px; -webkit-overflow-scrolling: touch; }
+
+        h2 { color: #e0e0e0; margin: 0 0 8px 0; font-size: 1.0em; text-transform: uppercase; letter-spacing: 1px; }
+        h3 { color: #e05a3e; margin: 12px 0 4px 0; font-size: 0.9em; text-transform: uppercase; }
+
+        select, button { 
+            width: 100%; padding: 12px; background: #202028; color: #fff; 
+            border: 1px solid #445; border-radius: 4px; font-family: inherit; 
+            margin-bottom: 8px; font-size: 14px; 
+        }
+        
+        .btn-action { background: #e05a3e; font-weight: bold; border: none; cursor: pointer; }
+        .btn-action:active { transform: translateY(1px); background: #ff7b5f; }
+        
+        .btn-secondary { background: #334; border: 1px solid #445; cursor: pointer; }
+        .btn-secondary:hover { background: #445; }
+        
+        #file-drop-zone {
+            border: 2px dashed #445; border-radius: 4px; padding: 20px;
+            text-align: center; color: #667; margin-bottom: 10px;
+            transition: all 0.2s; cursor: pointer;
+        }
+        #file-drop-zone:hover, #file-drop-zone.dragover {
+            border-color: #e05a3e; color: #e05a3e; background: rgba(224, 90, 62, 0.1);
+        }
+        input[type="file"] { display: none; }
+        .db-status { font-size: 0.75em; color: #4ade80; text-align: center; margin-top: 5px; }
+        .db-status.default { color: #889; }
+
+        .info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.9em; border-bottom: 1px solid #2a2a35; padding-bottom: 3px; }
+        .info-label { color: #778; }
+        .info-value { color: #dfd; font-weight: 600; text-align: right; max-width: 65%; }
+        
+        a.data-link { color: #fbbf24; text-decoration: none; border-bottom: 1px dotted #fbbf24; }
+        .desc-box { background: #15151c; padding: 10px; border-left: 3px solid #e05a3e; font-size: 0.85em; color: #ccc; font-style: italic; margin-top: 5px; line-height: 1.4; }
+        .sub-desc { font-size: 0.8em; color: #889; margin-top: 4px; border-top: 1px solid #334; padding-top: 4px; }
+        
+        #sector-header { padding: 15px; background: #181820; border-bottom: 1px solid #2a2a35; text-align: center; }
+        #sector-title { margin: 0; color: #fff; font-size: 1.2em; text-transform: uppercase; letter-spacing: 2px; }
+        #sector-region { color: #e05a3e; font-size: 0.8em; letter-spacing: 1px; text-transform: uppercase; }
+
+        .npc-card { background: #1a1a22; padding: 10px; margin-bottom: 10px; border-left: 2px solid #445; border-radius: 0 4px 4px 0; }
+        .stat-block { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; margin-top: 5px; }
+        .stat-box { background: #22222a; padding: 3px; border-radius: 2px; text-align: center; }
+        .stat-name { font-size: 0.55em; color: #889; display: block; letter-spacing: 1px; }
+        .stat-val { font-size: 0.9em; font-weight: bold; color: #fff; }
+        
+        .btn-mini { background: #2a2a35; border: 1px solid #445; color: #aab; font-size: 0.7em; padding: 2px 6px; cursor: pointer; border-radius: 3px; margin-left: 5px; }
+        .btn-mini:hover { background: #e05a3e; color: #fff; }
+
+        .tag { display: inline-block; font-size: 0.7em; padding: 2px 5px; border-radius: 3px; vertical-align: middle; }
+        .tag-habitable { background: #166534; color: #86efac; border: 1px solid #22c55e; }
+        .tag-hostile { background: #7f1d1d; color: #fca5a5; border: 1px solid #ef4444; }
+        .tag-space { background: #1e1b4b; color: #c7d2fe; border: 1px solid #6366f1; }
+
+        .error-log { color: #ff9999; background: #330000; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 0.8em; }
+
+    </style>
+</head>
+<body>
+
+    <button id="menu-toggle" onclick="toggleSidebar()">/// DATA</button>
+
+    <div id="sidebar">
+        <div id="sector-header">
+            <h1 id="sector-title">SECTOR NAME</h1>
+            <span id="sector-region">REGION</span>
+        </div>
+
+        <div class="panel-section">
+            <h2>Navigation</h2>
+            <div style="display:flex; gap:5px; flex-wrap: wrap;">
+                <select id="regionSelect" style="margin-bottom:0; flex-grow: 1;">
+                    <option value="terminus">Terminus (4 Set)</option>
+                    <option value="outlands" selected>Outlands (3 Set)</option>
+                    <option value="expanse">Expanse (2 Set)</option>
+                </select>
+                <button class="btn-action" onclick="safeGenerate()" style="margin-bottom:0; width: auto;">SCAN</button>
+                <button class="btn-secondary" onclick="downloadMap()" style="margin-bottom:0; width: 100%;">CAPTURE MAP</button>
+            </div>
+            <div id="status-bar" style="font-size: 0.7em; color: #667; text-align: center; margin-top: 5px;">
+                Scale: 1 Hex = 1 Day (24h)
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <h2>Database Link</h2>
+            <div id="file-drop-zone" onclick="document.getElementById('csvInput').click()">
+                Drop CSV files here<br>or click to upload
+            </div>
+            <input type="file" id="csvInput" multiple accept=".csv" onchange="handleFiles(this.files)">
+            <div style="display:flex; justify-content: space-between; align-items: center;">
+                <span id="db-status-text" class="db-status default">Using Default Data</span>
+                <button onclick="resetData()" style="width: auto; padding: 5px 10px; font-size: 0.8em; margin:0;">RESET</button>
+            </div>
+        </div>
+
+        <div class="scroll-area">
+            <div id="details-content">
+                <div style="text-align: center; color: #445; margin-top: 20px;">
+                    System Online.<br>Ready to Scan.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-view">
+        <div id="map-wrapper">
+            <canvas id="hexCanvas"></canvas>
+        </div>
+    </div>
+
+<script>
+    // --- 1. DEFAULT DATA ---
+    const defaultDB = {
+        "Sector Name Prefix": ["Aether","Borealis","Chimera","Driftwood","Echo","Fractal","Gorgon","Hyperion","Obsidian","Vanguard"],
+        "Sector Name Suffix": ["Abyss","Cluster","Depths","Expanse","Frontier","Limit","Marches","Nexus","Reach","Void"],
+        "Stellar Object": ["Yellow Dwarf","Red Dwarf","Red Giant","Blue Supergiant","White Dwarf","Neutron Star","Pulsar","Magnetar","Black Hole","Binary Star System","Brown Dwarf","Wolf-Rayet Star","Rogue Planet","Protoplanetary Disk","Globular Cluster","Open Cluster","Planetary Nebula","Supernova Remnant","Dark Nebula","Herbig\u2013Haro Object"],
+        "Stellar Desc": ["A G-type main-sequence star.","A small, cool M-type star.","A dying star that has expanded massively.","A hot, luminous O or B-type star.","The dense, glowing remnant of a dead star.","A city-sized stellar remnant.","A highly magnetized rotating neutron star.","A neutron star with an extremely powerful magnetic field.","A region of spacetime where gravity is strong.","Two stars orbiting around a common center.","A 'failed star' too massive to be a planet.","A rare, evolved, and extremely hot star.","A planetary-mass object orbiting the galaxy directly.","A rotating circumstellar disk of dense gas.","A spherical collection of stars.","A group of up to a few thousand stars.","An emission nebula of ionized gas.","The structure resulting from a supernova.","A dense cloud of interstellar gas.","Bright patches of nebulosity."],
+        "Stellar Wiki": ["","","","","","","","","","","","","","","","","","","",""],
+        "Planet Name": ["Chthonian planet","Carbon planet","Coreless planet","Desert planet","Gas dwarf","Gas giant","Helium planet","Ice giant","Ice planet","Iron planet","Lava planet","Ocean planet","Protoplanet","Puffy planet","Silicate planet","Terrestrial planet"],
+        "Planet Desc": ["Gas giant with stripped atmosphere.","Carbon-rich terrestrial planet.","Planet with no metallic core.","Arid surface consistency.","Low-mass hydrogen planet.","Massive hydrogen planet.","Helium-dominated atmosphere.","Composed mainly of heavier elements.","Icy surface of volatiles.","Iron-rich core with little mantle.","Surface covered by molten lava.","Surface covered by liquid.","Large planetary embryo.","Large radius for its mass.","Composed of silicate rocks.","Rocky planet."],
+        "Planet Habitable": ["NO","NO","NO","YES","NO","NO","NO","NO","NO","NO","NO","YES","NO","NO","YES","YES"],
+        "Planet Wiki": ["","","","","","","","","","","","","","","",""],
+        "Settlement Name Prefix": ["Aegis","Altair","Apex","Ark","Astra","Aurora","Beacon","Black","Cinder","Cloud"],
+        "Settlement Name Suffix": ["Anchor","Arch","Base","Bay","Breach","Brink","Camp","Citadel","City","Colony"],
+        "Settlement Location": ["Planetside (Scattered)","Orbital (Debris)","Deep Space Station"],
+        "Location Desc": ["Scattered habs on rough terrain.","Hidden amongst ship husks.","Spinning torus in the void."],
+        "Settlement Population": ["Few","Hundreds","Thousands"],
+        "Settlement Authority": ["Lawless","Corporate","Military"],
+        "Settlement Economy": ["Farming","Mining","Salvage"],
+        "NPC First Name": ["Kaelen","Jyn","Voss","Iora","Tyra"],
+        "NPC Surname": ["Li","Wang","Zhang","Nguyen","Kim"],
+        "NPC Descriptor": ["Battered gear","Cybernetic arm","Nervous tic"],
+        "Ship Name": ["Iron Heart","Solar Wind","Void Drifter"],
+        "Visitor Type": ["Bounty Hunter","Smuggler","Trader"]
+    };
+
+    let oracleDB = JSON.parse(JSON.stringify(defaultDB));
+    let usedNames = new Set();
+    let usedSettlementNames = new Set();
+    let sectorMap = [];
+    let spaceLanes = [];
+    let starBackground = [];
+    const HEX_SIZE = 24;
+    let currentSectorName = "";
+    let currentRegion = "";
+    let currentSystemName = "";
+
+    // --- 2. DATA MANAGEMENT ---
+    function loadStorage() {
+        const saved = localStorage.getItem('starforgedDB');
+        if(saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if(parsed['Sector Name Prefix']) {
+                    oracleDB = parsed;
+                    updateStatus(true);
+                }
+            } catch(e) { console.error("Save corrupt"); }
+        }
+    }
+
+    function updateStatus(isCustom) {
+        const el = document.getElementById('db-status-text');
+        el.innerText = isCustom ? "Custom Data Loaded" : "Using Default Data";
+        el.style.color = isCustom ? "#4ade80" : "#889";
+    }
+
+    function resetData() {
+        if(confirm("Clear custom data and return to defaults?")) {
+            localStorage.removeItem('starforgedDB');
+            oracleDB = JSON.parse(JSON.stringify(defaultDB));
+            updateStatus(false);
+            safeGenerate();
+        }
+    }
+
+    function handleFiles(files) {
+        if(files.length === 0) return;
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function(e) { parseAndMergeCSV(e.target.result); };
+            reader.readAsText(file);
+        });
+    }
+
+    const dropZone = document.getElementById('file-drop-zone');
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('dragover'); });
+    dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+
+    function parseAndMergeCSV(text) {
+        const rows = text.split('\n').map(r => r.trim()).filter(r => r);
+        if(rows.length < 2) return;
+        const headers = rows[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h => h.replace(/^"|"$/g, '').trim());
+        const newCols = {};
+        headers.forEach(h => newCols[h] = []);
+        for(let i=1; i<rows.length; i++) {
+            const cells = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            headers.forEach((h, idx) => {
+                let val = cells[idx];
+                if(val) { val = val.replace(/^"|"$/g, '').replace(/""/g, '"').trim(); if(val) newCols[h].push(val); }
+            });
+        }
+        let updatedCount = 0;
+        headers.forEach(h => {
+            if(newCols[h].length > 0) { 
+                oracleDB[h] = [...new Set(newCols[h])]; 
+                updatedCount++; 
+            }
+        });
+        
+        if(oracleDB["Stellar Object"]) {
+            ["Black Hole", "Nebula", "Protoplanetary Disk", "Yellow Dwarf"].forEach(e => {
+                if(!oracleDB["Stellar Object"].includes(e)) oracleDB["Stellar Object"].push(e);
+            });
+        }
+
+        if(updatedCount > 0) {
+            localStorage.setItem('starforgedDB', JSON.stringify(oracleDB));
+            updateStatus(true);
+            safeGenerate();
+            alert(`Database Updated! Loaded ${updatedCount} columns.`);
+        }
+    }
+
+    // --- 3. GENERATORS ---
+    function roll(category) {
+        const list = oracleDB[category] || defaultDB[category] || ["UNKNOWN"];
+        return list[Math.floor(Math.random() * list.length)];
+    }
+
+    function rollLinked(catA, catB) {
+        const listA = oracleDB[catA] || defaultDB[catA];
+        const listB = oracleDB[catB] || defaultDB[catB];
+        const idx = Math.floor(Math.random() * listA.length);
+        return { main: listA[idx], sub: listB && listB[idx] ? listB[idx] : "" };
+    }
+    
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+    
+    function toRoman(num) {
+        const roman = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
+        return roman[num] || num;
+    }
+
+    function renderLink(text, url) {
+        if (url && url.length > 5) return `<a href="${url}" target="_blank" class="data-link">${text}</a> ↗`;
+        return text;
+    }
+
+    function getStellarColor(type) {
+        const t = type.toLowerCase();
+        if (t.includes("red")) return "#ef4444"; 
+        if (t.includes("blue")) return "#3b82f6"; 
+        if (t.includes("yellow")) return "#fbbf24"; 
+        if (t.includes("white")) return "#e5e7eb"; 
+        if (t.includes("black")) return "#000000"; 
+        if (t.includes("neutron") || t.includes("pulsar") || t.includes("magnetar")) return "#06b6d4"; 
+        if (t.includes("brown")) return "#92400e"; 
+        if (t.includes("nebula") || t.includes("remnant")) return "#d946ef"; 
+        return "#fbbf24"; 
+    }
+
+    function rollPlanet(mustBeHabitable, planetIndex) {
+        const names = oracleDB['Planet Name'];
+        const descs = oracleDB['Planet Desc'];
+        const habits = oracleDB['Planet Habitable'];
+        const wikis = oracleDB['Planet Wiki']; 
+
+        let validIndexes = [];
+        for(let i=0; i<names.length; i++) {
+            const h = habits[i] ? habits[i].trim().toUpperCase() : "NO";
+            const isHabitable = (h === 'YES');
+            if (mustBeHabitable) {
+                if(isHabitable) validIndexes.push(i);
+            } else {
+                validIndexes.push(i);
+            }
+        }
+
+        if (validIndexes.length === 0) return { main: "Anomaly", sub: "Unknown", wiki: null, name: "Unknown" };
+        const idx = validIndexes[Math.floor(Math.random() * validIndexes.length)];
+        
+        let finalName;
+        let scientificName = `${currentSystemName} ${toRoman(planetIndex)}`;
+        
+        if (Math.random() < 0.3) {
+            let attempts = 0;
+            let candidate;
+            do {
+                candidate = roll('Settlement Name Prefix');
+                attempts++;
+            } while (usedNames.has(candidate) && attempts < 10);
+            
+            if (usedNames.has(candidate) || candidate === currentSystemName) {
+                finalName = scientificName;
+            } else {
+                finalName = candidate;
+            }
+        } else {
+            finalName = scientificName;
+        }
+        usedNames.add(finalName);
+
+        return { main: names[idx], sub: descs[idx], wiki: wikis[idx], name: finalName };
+    }
+
+    function rollStellar() {
+        const listA = oracleDB['Stellar Object'];
+        const listB = oracleDB['Stellar Desc'];
+        const listC = oracleDB['Stellar Wiki'];
+        const idx = Math.floor(Math.random() * listA.length);
+        return { main: listA[idx], sub: listB[idx], wiki: listC[idx] };
+    }
+
+    function generateVisitor() {
+        const s = [3, 2, 2, 1, 1];
+        for (let i = s.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [s[i], s[j]] = [s[j], s[i]];
+        }
+        return {
+            type: roll('Visitor Type'),
+            ship: roll('Ship Name'),
+            npc: `${roll('NPC First Name')} ${roll('NPC Surname')}`, 
+            desc: roll('NPC Descriptor'),
+            stats: { edge:s[0], heart:s[1], iron:s[2], shadow:s[3], wits:s[4] }
+        };
+    }
+
+    function generateSettlement(forcedContext) {
+        let locObj, celestial, celestialTag;
+        if (forcedContext === 'OrbitalOnly') {
+            const allLocs = oracleDB['Settlement Location'];
+            const orbitalIndices = allLocs.map((loc, i) => (loc.includes("Orbital") || loc.includes("Deep Space")) ? i : -1).filter(i => i !== -1);
+            const idx = orbitalIndices[Math.floor(Math.random() * orbitalIndices.length)];
+            locObj = { main: oracleDB['Settlement Location'][idx], sub: oracleDB['Location Desc'][idx] };
+            celestial = { main: "Void", sub: "Deep Space Vacuum", wiki: null, name: "Deep Space" };
+            celestialTag = "tag-space";
+        } else {
+            locObj = rollLinked('Settlement Location', 'Location Desc');
+            const locName = locObj.main.toLowerCase();
+            if (locName.includes('planet') || locName.includes('terrestrial') || locName.includes('orbital')) {
+                const pIdx = Math.floor(Math.random() * 3) + 4;
+                celestial = rollPlanet(true, pIdx); 
+                celestialTag = "tag-habitable";
+            } else {
+                celestial = { main: "Void", sub: "Deep Space", wiki: null, name: "Deep Space" };
+                celestialTag = "tag-space";
+            }
+        }
+
+        let sName;
+        let attempts = 0;
+        do {
+            const pre = roll('Settlement Name Prefix');
+            const suf = roll('Settlement Name Suffix');
+            sName = (Math.random() > 0.5) ? `${pre}${suf.toLowerCase()}` : `${pre} ${suf}`;
+            attempts++;
+        } while (usedSettlementNames.has(sName) && attempts < 50);
+        usedSettlementNames.add(sName);
+
+        const npcCount = Math.floor(Math.random() * 6);
+        const visitors = [];
+        for(let i=0; i<npcCount; i++) visitors.push(generateVisitor());
+
+        return {
+            name: sName, loc: locObj.main, locDesc: locObj.sub,
+            pop: roll('Settlement Population'), auth: roll('Settlement Authority'), econ: roll('Settlement Economy'),
+            celestial: celestial, tag: celestialTag, visitors: visitors
+        };
+    }
+
+    // --- 6. MAP ENGINE ---
+    function generateStarfield(w, h) {
+        starBackground = [];
+        const count = Math.floor((w * h) / 3000); 
+        for(let i=0; i<count; i++) {
+            starBackground.push({
+                x: Math.random() * w, y: Math.random() * h,
+                r: Math.random() * 1.2 + 0.3, a: Math.random() * 0.7 + 0.1,
+                color: Math.random() > 0.9 ? "#aab" : "#fff" 
+            });
+        }
+    }
+
+    function safeGenerate() {
+        try {
+            document.getElementById('details-content').innerHTML = `<div style="text-align:center;color:#667;">Scanning System...</div>`;
+            setTimeout(() => {
+                generateSector();
+                if(window.innerWidth <= 800) toggleSidebar();
+            }, 50);
+        } catch(e) {
+            document.getElementById('details-content').innerHTML = `<div class="error-log">ERROR:<br>${e.message}</div>`;
+            console.error(e);
+        }
+    }
+
+    // --- PATHFINDING (Hex Grid) ---
+    // UPDATED: Pathfinding now respects Safety Zones
+    function calculateRoutes(pois, safetyDist) {
+        let routes = [];
+        if(pois.length < 2) return routes;
+        
+        let unvisited = [...pois];
+        unvisited.sort((a,b) => a.y - b.y);
+
+        let current = unvisited.shift();
+        
+        while(unvisited.length > 0) {
+            let nearest = null;
+            let minD = Infinity;
+            let nIdx = -1;
+            
+            for(let i=0; i<unvisited.length; i++) {
+                const target = unvisited[i];
+                const d = Math.sqrt(Math.pow(target.x - current.x, 2) + Math.pow(target.y - current.y, 2));
+                if(d < minD) { minD = d; nearest = target; nIdx = i; }
+            }
+            
+            if(nearest) {
+                // Pass Safety Distance to Pathfinder
+                const path = findHexPath(current, nearest, safetyDist);
+                if(path.length > 0) {
+                    routes.push(path);
+                }
+                current = nearest;
+                unvisited.splice(nIdx, 1);
+            } else {
+                break;
+            }
+        }
+        return routes;
+    }
+
+    function findHexPath(start, end, safetyDist) {
+        let path = [{x: start.x, y: start.y}];
+        let curr = start;
+        let distToEnd = Math.sqrt(Math.pow(start.x - end.x, 2) + Math.pow(start.y - end.y, 2));
+        
+        // Safety Break
+        let steps = 0;
+        
+        while(steps < 100) { // Increased steps for complex avoidance
+            let bestNext = null;
+            let bestDist = Infinity;
+            
+            for(let i=0; i<sectorMap.length; i++) {
+                const h = sectorMap[i];
+                const dToCurr = Math.sqrt(Math.pow(h.x - curr.x, 2) + Math.pow(h.y - curr.y, 2));
+                
+                // Neighbor Check
+                if(dToCurr > 1 && dToCurr < HEX_SIZE * 2.2) {
+                    const dToEnd = Math.sqrt(Math.pow(h.x - end.x, 2) + Math.pow(h.y - end.y, 2));
+                    
+                    // COST CALCULATION
+                    let cost = dToEnd;
+                    
+                    // 1. Avoid Planets/Stars (unless target)
+                    if(h !== end && (h.type === 'anchor' || h.type === 'planet')) cost += 1000;
+                    
+                    // 2. SAFETY ZONE AVOIDANCE (New!)
+                    // If this hex is inside the safety zone, add massive penalty
+                    if(h.dist < safetyDist && h !== end && h !== start) {
+                        // If it's a Black Hole, Infinite cost (Impossible)
+                        if(window.isBlackHoleMode) cost += 99999;
+                        // If it's a Star, high cost (Avoid corona)
+                        else cost += 500;
+                    }
+
+                    // 3. Simple loop prevention (don't go back immediately)
+                    // (Basic greedy doesn't handle loops well, but cost penalty helps)
+                    
+                    if(cost < bestDist) {
+                        bestDist = cost;
+                        bestNext = h;
+                    }
+                }
+            }
+            
+            if(bestNext) {
+                path.push({x: bestNext.x, y: bestNext.y});
+                curr = bestNext;
+                // If we reached the end hex (or very close), stop
+                if(Math.abs(curr.x - end.x) < 5 && Math.abs(curr.y - end.y) < 5) break;
+            } else {
+                break;
+            }
+            steps++;
+        }
+        
+        path.push({x: end.x, y: end.y});
+        return path;
+    }
+
+    // --- 7. EXPORT & GENERATION ---
+    function downloadNPC(settlementIdx, visitorIdx) {
+        const settlementHex = sectorMap.find(h => h.type === 'settlement' && h.label == settlementIdx);
+        if (!settlementHex) return;
+        
+        const s = settlementHex.data;
+        const v = s.visitors[visitorIdx];
+        
+        const content = `STARFORGED CHARACTER PROFILE\n-----------------------------------\nCAPTAIN: ${v.npc}\nSHIP: ${v.ship}\nROLE: ${v.type}\nTRAIT: ${v.desc}\nLOCATION: ${s.name} (${s.loc})\n\nSTATS\n-----------------------------------\nEDGE: ${v.stats.edge}\nHEART: ${v.stats.heart}\nIRON: ${v.stats.iron}\nSHADOW: ${v.stats.shadow}\nWITS: ${v.stats.wits}\n\nGENERATED BY STARFORGED ARCHITECT`;
+        const blob = new Blob([content], { type: "text/plain" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `Captain_${v.npc.replace(/\s/g, '_')}.txt`;
+        link.click();
+    }
+
+    function downloadMap() {
+        const mapCanvas = document.getElementById('hexCanvas');
+        const legendWidth = 500; 
+        const composedCanvas = document.createElement('canvas');
+        composedCanvas.width = mapCanvas.width + legendWidth;
+        composedCanvas.height = mapCanvas.height;
+        const ctx = composedCanvas.getContext('2d');
+
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, composedCanvas.width, composedCanvas.height);
+        ctx.drawImage(mapCanvas, 0, 0);
+
+        const lx = mapCanvas.width;
+        ctx.fillStyle = "#121218";
+        ctx.fillRect(lx, 0, legendWidth, mapCanvas.height);
+        ctx.strokeStyle = "#334"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, mapCanvas.height); ctx.stroke();
+
+        let y = 50; const x = lx + 30; const w = legendWidth - 60;
+
+        function text(str, size, color, weight="bold") {
+            ctx.fillStyle = color; ctx.font = `${weight} ${size}px 'Segoe UI', sans-serif`;
+            ctx.fillText(str, x, y); y += size + 8;
+        }
+
+        function wrapText(str, size, color) {
+            ctx.fillStyle = color; ctx.font = `normal ${size}px 'Segoe UI', sans-serif`;
+            const words = str.split(' ');
+            let line = '';
+            for(let n = 0; n < words.length; n++) {
+                const testLine = line + words[n] + ' ';
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > w && n > 0) {
+                    ctx.fillText(line, x, y);
+                    line = words[n] + ' ';
+                    y += size + 6;
+                } else {
+                    line = testLine;
+                }
+            }
+            ctx.fillText(line, x, y);
+            y += size + 15;
+        }
+
+        text(currentSectorName, 36, "#fff");
+        text(`${currentRegion.toUpperCase()} SECTOR`, 20, "#e05a3e");
+        y += 40;
+
+        const anchor = sectorMap.find(h => h.type === 'anchor');
+        if(anchor) {
+            text("SYSTEM ANCHOR", 14, "#667");
+            text(currentSystemName, 24, "#fff");
+            text(anchor.data.main, 18, "#fbbf24");
+            wrapText(anchor.data.sub, 14, "#aab");
+        }
+
+        const settlements = sectorMap.filter(h => h.type === 'settlement').sort((a,b) => a.label - b.label);
+        if(settlements.length > 0) {
+            text("SETTLEMENTS", 14, "#667");
+            settlements.forEach(s => {
+                text(`[${s.label}] ${s.data.name}`, 18, "#38bdf8");
+                text(`${s.data.loc} • ${s.data.celestial.name}`, 14, "#fff", "normal");
+                text(`${s.data.pop} • ${s.data.auth} • ${s.data.econ}`, 13, "#889", "normal");
+                wrapText(s.data.locDesc, 13, "#aab");
+            });
+            y += 10;
+        }
+
+        const planets = sectorMap.filter(h => h.type === 'planet').sort((a,b) => a.label.localeCompare(b.label));
+        const debris = sectorMap.filter(h => h.type === 'debris').sort((a,b) => a.label.localeCompare(b.label));
+        
+        if(planets.length > 0 || debris.length > 0) {
+            text("SURVEYED PLANETS & DEBRIS", 14, "#667");
+            planets.forEach(p => {
+                text(`[${p.label}] ${p.data.name}`, 16, "#7c3aed");
+                text(p.data.main, 14, "#fff", "normal");
+                wrapText(p.data.sub, 13, "#889");
+            });
+            debris.forEach(d => {
+                text(`[${d.label}] ${d.data.name}`, 16, "#fca5a5");
+                text("Planetary Debris Field", 14, "#fff", "normal");
+                wrapText("A region of high-velocity impact remnants.", 13, "#889");
+            });
+        }
+
+        const link = document.createElement('a');
+        link.download = `Sector-${currentSectorName.replace(/\s/g, '_')}.png`;
+        link.href = composedCanvas.toDataURL();
+        link.click();
+    }
+
+    function generateSector() {
+        const container = document.getElementById('map-wrapper');
+        const canvas = document.getElementById('hexCanvas');
+        canvas.width = container.offsetWidth; canvas.height = container.offsetHeight;
+        
+        generateStarfield(canvas.width, canvas.height);
+        sectorMap = []; usedNames = new Set(); usedSettlementNames = new Set(); spaceLanes = [];
+        
+        const region = document.getElementById('regionSelect').value;
+        let settCount = region === 'terminus' ? 4 : region === 'outlands' ? 3 : 2;
+        const name = roll('Sector Name Prefix') + ' ' + roll('Sector Name Suffix');
+        
+        const starName = roll('Sector Name Prefix');
+        currentSystemName = starName; usedNames.add(starName);
+        currentSectorName = name; currentRegion = region;
+
+        const xOffset = HEX_SIZE * 1.732; const yOffset = HEX_SIZE * 1.5;
+        const cols = Math.floor(canvas.width / xOffset) - 1; const rows = Math.floor(canvas.height / yOffset) - 1;
+        const centerX = Math.floor(cols / 2); const centerY = Math.floor(rows / 2);
+
+        // TRANSIT LOGIC
+        const transitChance = region === 'terminus' ? 0.1 : region === 'outlands' ? 0.3 : 0.6;
+        const isTransit = Math.random() < transitChance;
+        if (isTransit) { settCount = Math.random() < 0.5 ? 0 : 1; }
+
+        // Anchor
+        const anchor = rollStellar();
+        const anchorName = anchor.main.toLowerCase();
+        const isBlackHole = anchorName.includes("black hole");
+        const isProto = anchorName.includes("protoplanetary");
+        const isNebula = anchorName.includes("nebula") || anchorName.includes("remnant");
+        const isStar = !isBlackHole && !isProto && !isNebula; 
+
+        document.getElementById('sector-title').innerText = name;
+        document.getElementById('sector-region').innerText = isTransit ? "TRANSIT CORRIDOR" : region + " Sector";
+        document.getElementById('details-content').innerHTML = `
+            <div style="text-align:center; padding: 10px;">
+                <div class="desc-box" style="margin-top:0; border-color:#fff;">
+                    <strong>${currentSystemName} System</strong><br>
+                    <span style="font-size:0.9em; color:#aab;">${renderLink(anchor.main, anchor.wiki)}</span>
+                    <div style="margin-top:5px; font-style:italic; font-size:0.85em; color:#889;">${anchor.sub}</div>
+                </div>
+                <div style="margin-top:15px; font-size:0.8em; color:#667;">Tap map objects for details.</div>
+            </div>`;
+
+        let deck = [];
+        for (let r = 1; r < rows; r++) {
+            for (let c = 1; c < cols; c++) {
+                const px = c * xOffset + (r % 2) * (xOffset / 2) + HEX_SIZE;
+                const py = r * yOffset + HEX_SIZE;
+                const dxPx = px - (centerX * xOffset + HEX_SIZE); 
+                const dyPx = py - (centerY * yOffset + HEX_SIZE);
+                const distPixels = Math.sqrt(dxPx*dxPx + dyPx*dyPx);
+                const distHexes = distPixels / (HEX_SIZE * 1.5); 
+
+                let hexType = 'empty'; let hexColor = 'transparent'; let data = null;
+
+                if (distPixels < HEX_SIZE * 1.9) {
+                    hexType = 'anchor'; hexColor = getStellarColor(anchorName); data = anchor;
+                } else {
+                    const noise = Math.random();
+                    if (isProto && noise < 0.15) { hexType = 'asteroid'; hexColor = '#333'; } 
+                    else if (isNebula && noise < 0.40) { hexType = 'dust'; hexColor = `rgba(${Math.random()*100}, 0, ${Math.random()*150 + 100}, 0.2)`; } 
+                    else if (isNebula && noise > 0.95) { hexType = 'asteroid'; hexColor = '#444'; }
+                }
+                deck.push({ x: px, y: py, c: c, r: r, dist: distHexes, type: hexType, color: hexColor, data: data });
+            }
+        }
+
+        const maxRadius = Math.min(centerX, centerY);
+        const safetyDist = isBlackHole ? Math.floor(maxRadius * 0.4) : 2;
+        const validDist = Math.min(maxRadius - 1, safetyDist); 
+        
+        // 1. Settlements
+        let validSpots = deck.filter(h => (h.type === 'empty' || h.type === 'dust') && h.dist > safetyDist);
+        shuffle(validSpots);
+
+        for(let i=0; i<settCount; i++) {
+            if(!validSpots.length) break;
+            const spot = validSpots.pop();
+            spot.type = 'settlement'; spot.label = (i+1).toString();
+            if (isTransit) {
+                spot.data = generateSettlement('OrbitalOnly');
+                spot.data.name += " Waystation";
+            } else {
+                spot.data = isProto ? generateSettlement('OrbitalOnly') : generateSettlement('Standard');
+            }
+            spot.color = '#38bdf8';
+        }
+
+        // 2. Gates
+        let edgeSpots = deck.filter(h => h.type === 'empty' && h.dist > validDist);
+        shuffle(edgeSpots);
+
+        if(edgeSpots.length > 0) {
+            const ent = edgeSpots.pop();
+            ent.type = 'entry'; ent.label = 'GATE'; ent.color = '#4ade80'; ent.meta = "Short Range Jump Gate";
+        }
+        if(edgeSpots.length > 0) {
+            const ext = edgeSpots.pop();
+            ext.type = 'exit'; ext.label = 'GATE'; ext.color = '#f87171'; ext.meta = "Short Range Jump Gate";
+        }
+
+        // 3. Planets
+        if (isStar) {
+            const planetMaxDist = maxRadius * 0.7;
+            let orbitSpots = deck.filter(h => h.type === 'empty' && h.dist > 2.5 && h.dist < planetMaxDist && h.dist > safetyDist);
+            shuffle(orbitSpots);
+            const numPlanets = Math.floor(Math.random() * 3) + 1; 
+            const labels = ["A", "B", "C", "D", "E"]; 
+            for(let i=0; i<numPlanets; i++) {
+                if(!orbitSpots.length) break;
+                const p = orbitSpots.pop();
+                p.type = 'planet'; p.color = '#7c3aed'; 
+                p.label = labels[i]; 
+                p.data = rollPlanet(false, i + 1);
+            }
+            
+            // Debris
+            const debrisSpots = deck.filter(h => h.type === 'empty' && h.dist > 2.5 && h.dist < planetMaxDist && h.dist > safetyDist);
+            debrisSpots.sort((a,b) => a.dist - b.dist);
+            const orbitSlots = 8;
+            const step = Math.floor(debrisSpots.length / orbitSlots);
+            let labelIndex = numPlanets;
+            for(let i = numPlanets; i < orbitSlots; i++) {
+                 const bandStart = i * step; const bandEnd = bandStart + step;
+                 if(bandEnd >= debrisSpots.length) break;
+                 if(Math.random() < 0.2) {
+                     const hex = debrisSpots[bandStart + Math.floor(Math.random() * (bandEnd - bandStart))];
+                     hex.type = 'debris'; hex.color = '#fca5a5'; hex.label = labels[labelIndex++];
+                     hex.data = { name: `Remnant of ${currentSystemName} ${toRoman(i+1)}`, main: "Debris Field", sub: "High-velocity planetary fragments.", wiki: null };
+                 }
+             }
+        }
+
+        sectorMap = deck; // Populate Map
+        
+        // --- PATHFINDING ---
+        // Route Calculation now has access to sectorMap (and safetyDist)
+        const pois = sectorMap.filter(h => h.type === 'entry' || h.type === 'settlement' || h.type === 'exit');
+        spaceLanes = calculateRoutes(pois, safetyDist); // PASS SAFETY DIST
+
+        window.currentSafetyDist = validDist; window.isBlackHoleMode = isBlackHole;
+        drawMap();
+    }
+
+    // --- 7. DRAWING ---
+    const canvas = document.getElementById('hexCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function drawStarIcon(x, y, r, color) {
+        ctx.fillStyle = "#fff"; ctx.beginPath();
+        for(let i=0; i<8; i++) {
+            ctx.lineTo(x + r*Math.cos(i*Math.PI/4), y + r*Math.sin(i*Math.PI/4));
+            ctx.lineTo(x + (r/3)*Math.cos((i+0.5)*Math.PI/4), y + (r/3)*Math.sin((i+0.5)*Math.PI/4));
+        }
+        ctx.closePath(); ctx.fill();
+    }
+
+    function drawBaseIcon(x, y) {
+        ctx.fillStyle = "#fff"; ctx.fillRect(x - 7, y - 7, 14, 14);
+    }
+
+    function drawPlanetIcon(x, y) {
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x, y, 7, 0, 2*Math.PI); ctx.fill();
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y, 10, 3, Math.PI/4, 0, 2*Math.PI); ctx.stroke();
+    }
+    
+    function drawDebrisIcon(x, y, color) {
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(x-4, y+4, 3, 0, 2*Math.PI); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+4, y-2, 2.5, 0, 2*Math.PI); ctx.fill();
+        ctx.beginPath(); ctx.arc(x-2, y-5, 2, 0, 2*Math.PI); ctx.fill();
+    }
+
+    function drawGateIcon(x, y, color) {
+        const r = 10; ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.fillStyle = 'rgba(0,0,0,0.8)'; 
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i - Math.PI / 2;
+            const px = x + r * Math.cos(angle); const py = y + r * Math.sin(angle);
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke(); 
+        
+        ctx.beginPath();
+        const topX = x + r * Math.cos(-Math.PI / 2); const topY = y + r * Math.sin(-Math.PI / 2);
+        const brX = x + r * Math.cos(Math.PI/6); const brY = y + r * Math.sin(Math.PI/6);
+        const blX = x + r * Math.cos(5*Math.PI/6); const blY = y + r * Math.sin(5*Math.PI/6);
+        ctx.moveTo(topX, topY); ctx.lineTo(brX, brY); ctx.lineTo(blX, blY); ctx.closePath(); ctx.stroke();
+
+        const trX = x + r * Math.cos(-Math.PI/6); const trY = y + r * Math.sin(-Math.PI/6);
+        const botX = x + r * Math.cos(Math.PI/2); const botY = y + r * Math.sin(Math.PI/2);
+        const tlX = x + r * Math.cos(7*Math.PI/6); const tlY = y + r * Math.sin(7*Math.PI/6);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(trX, trY); ctx.moveTo(x, y); ctx.lineTo(botX, botY); ctx.moveTo(x, y); ctx.lineTo(tlX, tlY); ctx.stroke();
+    }
+
+    function drawMap() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#020204"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        starBackground.forEach(star => {
+            ctx.fillStyle = star.color; ctx.globalAlpha = star.a; ctx.beginPath();
+            ctx.arc(star.x, star.y, star.r, 0, 2*Math.PI); ctx.fill();
+        });
+        ctx.globalAlpha = 1.0; 
+
+        // Draw Lanes (Last layer for visibility)
+        spaceLanes.forEach(path => {
+            if(path.length < 2) return;
+            ctx.strokeStyle = "#facc15"; // Bright Yellow
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 8]); 
+            ctx.beginPath();
+            ctx.moveTo(path[0].x, path[0].y);
+            for(let i=1; i<path.length; i++) {
+                ctx.lineTo(path[i].x, path[i].y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+        });
+
+        sectorMap.forEach(h => {
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle_rad = (Math.PI / 180) * (60 * i - 30);
+                ctx.lineTo(h.x + HEX_SIZE * Math.cos(angle_rad), h.y + HEX_SIZE * Math.sin(angle_rad));
+            }
+            ctx.closePath();
+
+            if (h.type === 'dust') { ctx.fillStyle = h.color; ctx.fill(); } 
+            else if (h.type === 'asteroid') {
+                ctx.fillStyle = h.color; ctx.beginPath(); ctx.arc(h.x, h.y, 2, 0, 2*Math.PI); ctx.fill();
+                ctx.beginPath(); ctx.arc(h.x + 4, h.y - 4, 1.5, 0, 2*Math.PI); ctx.fill();
+            }
+            else if (h.type !== 'empty') { 
+                if(h.type === 'anchor') {
+                    if(h.dist < 0.2) { ctx.fillStyle = h.color; } else { ctx.fillStyle = h.color + "80"; }
+                } else { ctx.fillStyle = h.color; }
+                ctx.fill(); 
+            }
+
+            ctx.strokeStyle = (h.type === 'empty') ? 'rgba(255,255,255,0.05)' : '#1a1a20'; 
+            ctx.lineWidth = 1; ctx.stroke();
+
+            // ICONS
+            if (h.type === 'anchor') {
+                if(h.dist < 0.2) {
+                    if(h.color === '#000000') {
+                        ctx.shadowBlur = 20; ctx.shadowColor = "#fff";
+                        ctx.beginPath(); ctx.arc(h.x, h.y, 10, 0, 2*Math.PI); ctx.fillStyle = '#fff'; ctx.fill(); 
+                        ctx.beginPath(); ctx.arc(h.x, h.y, 8, 0, 2*Math.PI); ctx.fillStyle = '#000'; ctx.fill(); 
+                        ctx.shadowBlur = 0;
+                    } else {
+                        ctx.shadowBlur = 30; ctx.shadowColor = h.color;
+                        drawStarIcon(h.x, h.y, 14, h.color); ctx.shadowBlur = 0;
+                    }
+                }
+            }
+            else if (h.type === 'settlement') {
+                drawBaseIcon(h.x, h.y);
+                ctx.fillStyle = "#000"; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(h.label, h.x, h.y);
+                // Name below Icon
+                ctx.fillStyle = "#fff"; ctx.font = 'bold 10px Arial';
+                ctx.fillText(h.data.name, h.x, h.y + 18);
+            }
+            else if (h.type === 'planet') { 
+                drawPlanetIcon(h.x, h.y); 
+                // Planet Label (A, B, C)
+                ctx.fillStyle = "#fff"; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(h.label, h.x, h.y - 12); 
+            }
+            else if (h.type === 'debris') {
+                drawDebrisIcon(h.x, h.y, h.color);
+                ctx.fillStyle = "#fff"; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(h.label, h.x, h.y - 12); 
+            }
+            else if (h.type === 'entry') { drawGateIcon(h.x, h.y, '#4ade80'); }
+            else if (h.type === 'exit') { drawGateIcon(h.x, h.y, '#f87171'); }
+        });
+
+        if(window.isBlackHoleMode) {
+            const centerX = canvas.width / 2; const centerY = canvas.height / 2;
+            const radiusPixels = window.currentSafetyDist * (HEX_SIZE * 1.5);
+            ctx.beginPath(); ctx.arc(centerX, centerY, radiusPixels, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#662'; ctx.setLineDash([5, 10]); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+        }
+
+        if(currentSectorName) {
+            ctx.save();
+            ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+            ctx.font = "bold 40px 'Segoe UI', sans-serif";
+            ctx.textAlign = "left"; ctx.textBaseline = "top";
+            ctx.fillText(currentSectorName, 30, 30);
+            ctx.font = "20px 'Segoe UI', sans-serif";
+            ctx.fillStyle = "rgba(224, 90, 62, 0.3)";
+            ctx.fillText(currentRegion.toUpperCase() + " SECTOR", 30, 75);
+            ctx.restore();
+        }
+    }
+
+    loadStorage();
+    const resizeObserver = new ResizeObserver(entries => { window.requestAnimationFrame(() => { safeGenerate(); }); });
+    resizeObserver.observe(document.getElementById('map-wrapper'));
+
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+    
+    function handleInput(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = clientX - rect.left; const my = clientY - rect.top;
+        let closest = null; let minDist = HEX_SIZE * 1.5; 
+        sectorMap.forEach(hex => {
+            const dist = Math.sqrt((mx - hex.x)**2 + (my - hex.y)**2);
+            if(dist < minDist) { minDist = dist; closest = hex; }
+        });
+        if(closest) {
+            renderDetails(closest);
+            if(window.innerWidth <= 800) document.getElementById('sidebar').classList.add('open');
+        }
+    }
+    canvas.addEventListener('mousedown', (e) => handleInput(e.clientX, e.clientY));
+    canvas.addEventListener('touchstart', (e) => {
+        if(e.touches.length > 0) { e.preventDefault(); handleInput(e.touches[0].clientX, e.touches[0].clientY); }
+    }, {passive: false});
+
+    function renderDetails(hex) {
+        const p = document.getElementById('details-content');
+        let html = '';
+        if(hex.type === 'empty' || hex.type === 'dust' || hex.type === 'asteroid') {
+            const status = hex.type === 'empty' ? 'Deep Space' : (hex.type === 'dust' ? 'Nebula Gas Cloud' : 'Asteroid Field');
+            html = `<div style="text-align:center; margin-top:20px; color:#556;"><h2>Nav Data</h2><p>Coordinates: ${hex.c} : ${hex.r}</p><p>Status: ${status}</p></div>`;
+        } 
+        else if(hex.type === 'anchor') {
+            html = `<h2>System Anchor</h2><div class="info-row"><span class="info-label">Object</span><span class="info-value">${renderLink(hex.data.main, hex.data.wiki)}</span></div><div class="desc-box">${hex.data.sub}</div>`;
+        }
+        else if(hex.type === 'planet') {
+            html = `<h2>${hex.data.name}</h2><div class="info-row"><span class="info-label">Class</span><span class="info-value">${renderLink(hex.data.main, hex.data.wiki)}</span></div><div class="desc-box">${hex.data.sub}</div><div class="sub-desc" style="color:#f87171;">No settlements detected.</div>`;
+        }
+        else if(hex.type === 'debris') {
+            html = `<h2>${hex.data.name}</h2><div class="info-row"><span class="info-label">Class</span><span class="info-value">Debris Field</span></div><div class="desc-box">${hex.data.sub}</div><div class="sub-desc" style="color:#f87171;">Warning: High Velocity Impacts</div>`;
+        }
+        else if(hex.type === 'entry' || hex.type === 'exit') {
+            const title = hex.type === 'entry' ? 'Incoming Vector' : 'Outgoing Vector';
+            html = `<h2>Jump Gate</h2><div class="info-row"><span class="info-label">Status</span><span class="info-value">Active</span></div><div class="info-row"><span class="info-label">Type</span><span class="info-value">${hex.meta}</span></div><div class="desc-box">A region of weak spacetime topology allowing for rapid FTL transit.</div><div class="sub-desc">${title}</div>`;
+        }
+        else if(hex.type === 'settlement') {
+            const d = hex.data; const v = d.visitor;
+            const sysName = d.tag === 'tag-habitable' ? renderLink(d.celestial.main, d.celestial.wiki) : d.celestial.main;
+            html = `<h2>Settlement Dossier</h2><div class="info-row"><span class="info-label">Designation</span><span class="info-value">${d.name}</span></div><div class="info-row"><span class="info-label">Location</span><span class="info-value">${d.loc}</span></div><div class="desc-box">${d.locDesc}</div><div class="info-row" style="margin-top:10px;"><span class="info-label">Orbital Parent or Planet</span><span class="info-value">${d.celestial.name || sysName}</span></div><div class="sub-desc">${d.celestial.sub}</div><h3>Demographics</h3><div class="info-row"><span class="info-label">Population</span><span class="info-value">${d.pop}</span></div><div class="info-row"><span class="info-label">Authority</span><span class="info-value">${d.auth}</span></div><div class="info-row"><span class="info-label">Economy</span><span class="info-value">${d.econ}</span></div>`;
+            html += `<h3>Active Traffic</h3>`;
+            if(d.visitors.length === 0) {
+                html += `<div style="color:#667; font-style:italic;">No ships on scope.</div>`;
+            } else {
+                d.visitors.forEach((v, idx) => {
+                    html += `<div class="npc-card"><div class="info-row"><span class="info-label">Captain</span><span class="info-value">${v.npc} <button class="btn-mini" onclick="downloadNPC('${d.name}', ${idx})">⇩ TXT</button></span></div><div class="info-row"><span class="info-label">Vessel</span><span class="info-value">${v.ship}</span></div><div class="info-row"><span class="info-label">Role</span><span class="info-value">${v.type}</span></div><div class="info-row"><span class="info-label">Trait</span><span class="info-value" style="font-size:0.8em">${v.desc}</span></div><div class="stat-block"><div class="stat-box" title="Edge"><span class="stat-name">EDG</span><span class="stat-val">${v.stats.edge}</span></div><div class="stat-box" title="Heart"><span class="stat-name">HRT</span><span class="stat-val">${v.stats.heart}</span></div><div class="stat-box" title="Iron"><span class="stat-name">IRN</span><span class="stat-val">${v.stats.iron}</span></div><div class="stat-box" title="Shadow"><span class="stat-name">SHD</span><span class="stat-val">${v.stats.shadow}</span></div><div class="stat-box" title="Wits"><span class="stat-name">WIT</span><span class="stat-val">${v.stats.wits}</span></div></div></div>`;
+                });
+            }
+        }
+        p.innerHTML = html;
+    }
+
+    // Startup
+    loadStorage();
+    setTimeout(safeGenerate, 300);
+
+</script>
+</body>
+</html>
