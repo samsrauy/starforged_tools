@@ -33,7 +33,10 @@ If you make a mistake or want to return to the original tables, click the **RESE
 
 ### **Required CSV Headers**
 
-The system recognizes data based on the **Header Row** (the first row of your CSV). Ensure your columns use these exact names:
+The system recognizes data based on the **Header Row** (the first row of your CSV). 
+What you name the CSV file does not matter as the **Header Row** determine how the code processes the information.
+
+Ensure your columns use these **exact** names in your Header Row:
 
 * Sector Name Prefix, Sector Name Suffix  
 * Stellar Object, Stellar Desc, Stellar Wiki  
