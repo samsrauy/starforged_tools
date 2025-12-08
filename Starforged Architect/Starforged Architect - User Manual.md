@@ -10,7 +10,7 @@ Because it runs entirely in your browser, **no internet connection is required**
 
 **1\. Getting Started**
 
-1. **Launch:** Simply double-click the architect.html file. It will open in your default web browser.  
+1. **Launch:** Simply double-click the ```architect.html``` file. It will open in your default web browser.  
 2. **Navigation:** Use the **Sidebar** (on the left) or the **Menu Button** (top-left on mobile) to control the generator.  
 3. **Generate:** Select a Region type (**Terminus**, **Outlands**, or **Expanse**) and click **SCAN** to generate a new sector.
 
