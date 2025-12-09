@@ -1,6 +1,6 @@
 # LICENSE-CC-BY-4.0.md
 
-## License Summary of CC-BY 4.0 International
+## Attribution 4.0 International
 
 *This section is a human-readable summary of (and not a substitute for) the full license included below.*
 
